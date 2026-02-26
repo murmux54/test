@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ポモドーロタイマー</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Hiragino Sans', 'Meiryo', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #1a1a2e;
+      color: #eee;
+      padding: 20px;
+      transition: background 0.6s ease;
+    }
+
+    body.break-mode {
+      background: #0f3460;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 420px;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: clamp(1.4rem, 5vw, 2rem);
+      letter-spacing: 0.1em;
+      margin-bottom: 8px;
+      opacity: 0.9;
+    }
+
+    .mode-label {
+      font-size: clamp(0.9rem, 3vw, 1.1rem);
+      font-weight: bold;
+      letter-spacing: 0.15em;
+      padding: 6px 20px;
+      border-radius: 20px;
+      display: inline-block;
+      margin-bottom: 40px;
+      transition: background 0.4s, color 0.4s;
+    }
+
+    .mode-label.focus {
+      background: rgba(229, 57, 53, 0.25);
+      color: #ff6b6b;
+      border: 1px solid rgba(229, 57, 53, 0.4);
+    }
+
+    .mode-label.break {
+      background: rgba(30, 136, 229, 0.25);
+      color: #64b5f6;
+      border: 1px solid rgba(30, 136, 229, 0.4);
+    }
+
+    /* Circular progress */
+    .timer-ring-wrapper {
+      position: relative;
+      width: clamp(220px, 70vw, 300px);
+      height: clamp(220px, 70vw, 300px);
+      margin: 0 auto 40px;
+    }
+
+    .timer-ring-wrapper svg {
+      transform: rotate(-90deg);
+      width: 100%;
+      height: 100%;
+    }
+
+    .ring-bg {
+      fill: none;
+      stroke: rgba(255,255,255,0.08);
+      stroke-width: 10;
+    }
+
+    .ring-progress {
+      fill: none;
+      stroke: #ff6b6b;
+      stroke-width: 10;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 1s linear, stroke 0.6s ease;
+    }
+
+    .ring-progress.break {
+      stroke: #64b5f6;
+    }
+
+    .timer-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .time-display {
+      font-size: clamp(3rem, 14vw, 4.5rem);
+      font-weight: 300;
+      letter-spacing: 0.05em;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
+
+    .session-count {
+      font-size: 0.8rem;
+      opacity: 0.5;
+      letter-spacing: 0.1em;
+    }
+
+    /* Buttons */
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: clamp(0.85rem, 3vw, 1rem);
+      font-weight: bold;
+      letter-spacing: 0.08em;
+      padding: 14px 32px;
+      transition: transform 0.15s, opacity 0.15s, box-shadow 0.15s;
+    }
+
+    button:active {
+      transform: scale(0.95);
+    }
+
+    #btn-start-pause {
+      background: linear-gradient(135deg, #ff6b6b, #ee0979);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(238, 9, 121, 0.35);
+      min-width: 130px;
+    }
+
+    #btn-start-pause.break-active {
+      background: linear-gradient(135deg, #64b5f6, #1565c0);
+      box-shadow: 0 4px 20px rgba(21, 101, 192, 0.4);
+    }
+
+    #btn-reset {
+      background: rgba(255,255,255,0.1);
+      color: #ccc;
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+
+    #btn-reset:hover {
+      background: rgba(255,255,255,0.18);
+    }
+
+    /* Session dots */
+    .session-dots {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 36px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.15);
+      transition: background 0.4s;
+    }
+
+    .dot.done {
+      background: #ff6b6b;
+    }
+
+    .dot.current {
+      background: rgba(255, 107, 107, 0.5);
+      box-shadow: 0 0 6px rgba(255,107,107,0.6);
+    }
+
+    /* Notification area */
+    .notification {
+      margin-top: 28px;
+      min-height: 24px;
+      font-size: 0.85rem;
+      opacity: 0;
+      transition: opacity 0.4s;
+      letter-spacing: 0.05em;
+    }
+
+    .notification.visible {
+      opacity: 0.7;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🍅 ポモドーロタイマー</h1>
+    <div class="mode-label focus" id="mode-label">集中タイム</div>
+
+    <div class="timer-ring-wrapper">
+      <svg viewBox="0 0 200 200">
+        <circle class="ring-bg" cx="100" cy="100" r="88"/>
+        <circle class="ring-progress" id="ring" cx="100" cy="100" r="88"/>
+      </svg>
+      <div class="timer-text">
+        <div class="time-display" id="time-display">25:00</div>
+        <div class="session-count" id="session-count">セッション 1</div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button id="btn-start-pause">スタート</button>
+      <button id="btn-reset">リセット</button>
+    </div>
+
+    <div class="session-dots" id="session-dots">
+      <div class="dot current"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+    </div>
+
+    <div class="notification" id="notification"></div>
+  </div>
+
+  <script>
+    const FOCUS_DURATION  = 25 * 60;  // seconds
+    const BREAK_DURATION  = 5  * 60;
+    const LONG_BREAK_DURATION = 15 * 60;
+    const SESSIONS_BEFORE_LONG_BREAK = 4;
+
+    let totalSeconds   = FOCUS_DURATION;
+    let remaining      = FOCUS_DURATION;
+    let intervalId     = null;
+    let isRunning      = false;
+    let isFocus        = true;
+    let sessionsDone   = 0;
+
+    const circumference = 2 * Math.PI * 88; // r=88
+
+    // DOM refs
+    const timeDisplay   = document.getElementById('time-display');
+    const modeLabel     = document.getElementById('mode-label');
+    const ring          = document.getElementById('ring');
+    const btnStartPause = document.getElementById('btn-start-pause');
+    const btnReset      = document.getElementById('btn-reset');
+    const sessionCount  = document.getElementById('session-count');
+    const sessionDots   = document.getElementById('session-dots');
+    const notification  = document.getElementById('notification');
+
+    // Init ring
+    ring.style.strokeDasharray  = circumference;
+    ring.style.strokeDashoffset = 0;
+
+    function formatTime(sec) {
+      const m = String(Math.floor(sec / 60)).padStart(2, '0');
+      const s = String(sec % 60).padStart(2, '0');
+      return `${m}:${s}`;
+    }
+
+    function updateDisplay() {
+      timeDisplay.textContent = formatTime(remaining);
+      const progress = 1 - remaining / totalSeconds;
+      ring.style.strokeDashoffset = circumference * (1 - progress);
+    }
+
+    function updateModeUI() {
+      if (isFocus) {
+        modeLabel.textContent = '集中タイム';
+        modeLabel.className   = 'mode-label focus';
+        ring.className        = 'ring-progress';
+        document.body.classList.remove('break-mode');
+        btnStartPause.classList.remove('break-active');
+      } else {
+        modeLabel.textContent = '休憩タイム';
+        modeLabel.className   = 'mode-label break';
+        ring.className        = 'ring-progress break';
+        document.body.classList.add('break-mode');
+        btnStartPause.classList.add('break-active');
+      }
+      sessionCount.textContent = `セッション ${sessionsDone + 1}`;
+      updateDots();
+    }
+
+    function updateDots() {
+      const dots = sessionDots.querySelectorAll('.dot');
+      dots.forEach((dot, i) => {
+        dot.className = 'dot';
+        if (i < sessionsDone % SESSIONS_BEFORE_LONG_BREAK) {
+          dot.classList.add('done');
+        } else if (i === sessionsDone % SESSIONS_BEFORE_LONG_BREAK && isFocus) {
+          dot.classList.add('current');
+        }
+      });
+    }
+
+    // --- Sound (Web Audio API) ---
+    let audioCtx = null;
+
+    function getAudioCtx() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      return audioCtx;
+    }
+
+    function playBeep(type = 'focus') {
+      try {
+        const ctx = getAudioCtx();
+        const notes = type === 'focus'
+          ? [{ freq: 880, start: 0, dur: 0.15 }, { freq: 880, start: 0.2, dur: 0.15 }, { freq: 1100, start: 0.45, dur: 0.35 }]
+          : [{ freq: 660, start: 0, dur: 0.4 }, { freq: 550, start: 0.5, dur: 0.5 }];
+
+        notes.forEach(({ freq, start, dur }) => {
+          const osc   = ctx.createOscillator();
+          const gain  = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.type      = 'sine';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0, ctx.currentTime + start);
+          gain.gain.linearRampToValueAtTime(0.35, ctx.currentTime + start + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur);
+          osc.start(ctx.currentTime + start);
+          osc.stop(ctx.currentTime + start + dur + 0.05);
+        });
+      } catch (e) {
+        // AudioContext unavailable — fail silently
+      }
+    }
+
+    function showNotification(msg) {
+      notification.textContent  = msg;
+      notification.classList.add('visible');
+      setTimeout(() => notification.classList.remove('visible'), 4000);
+    }
+
+    function tick() {
+      if (remaining > 0) {
+        remaining--;
+        updateDisplay();
+      } else {
+        clearInterval(intervalId);
+        isRunning = false;
+        onTimerEnd();
+      }
+    }
+
+    function onTimerEnd() {
+      if (isFocus) {
+        sessionsDone++;
+        const isLongBreak = sessionsDone % SESSIONS_BEFORE_LONG_BREAK === 0;
+        isFocus      = false;
+        totalSeconds = isLongBreak ? LONG_BREAK_DURATION : BREAK_DURATION;
+        remaining    = totalSeconds;
+        playBeep('break');
+        showNotification(isLongBreak ? '🎉 お疲れ様！長めの休憩を取りましょう。' : '☕ 休憩タイムです！少し休んで下さい。');
+      } else {
+        isFocus      = true;
+        totalSeconds = FOCUS_DURATION;
+        remaining    = totalSeconds;
+        playBeep('focus');
+        showNotification('✏️ 集中タイム開始！頑張りましょう！');
+      }
+      updateModeUI();
+      updateDisplay();
+      btnStartPause.textContent = 'スタート';
+      // Auto-start next session
+      startTimer();
+    }
+
+    function startTimer() {
+      if (isRunning) return;
+      isRunning      = true;
+      btnStartPause.textContent = '一時停止';
+      intervalId = setInterval(tick, 1000);
+    }
+
+    function pauseTimer() {
+      isRunning = false;
+      clearInterval(intervalId);
+      btnStartPause.textContent = '再スタート';
+    }
+
+    function resetTimer() {
+      clearInterval(intervalId);
+      isRunning    = false;
+      isFocus      = true;
+      sessionsDone = 0;
+      totalSeconds = FOCUS_DURATION;
+      remaining    = FOCUS_DURATION;
+      btnStartPause.textContent = 'スタート';
+      btnStartPause.classList.remove('break-active');
+      updateModeUI();
+      updateDisplay();
+      notification.classList.remove('visible');
+    }
+
+    btnStartPause.addEventListener('click', () => {
+      if (isRunning) {
+        pauseTimer();
+      } else {
+        startTimer();
+      }
+    });
+
+    btnReset.addEventListener('click', resetTimer);
+
+    // Initial render
+    updateModeUI();
+    updateDisplay();
+  </script>
+</body>
+</html>
