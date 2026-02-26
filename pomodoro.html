@@ -250,6 +250,8 @@
     let isRunning      = false;
     let isFocus        = true;
     let sessionsDone   = 0;
+    // バックグラウンド対策: タイマー終了時刻を絶対時刻で管理
+    let endTime        = null; // Date.now() + remaining*1000
 
     const circumference = 2 * Math.PI * 88; // r=88
 
@@ -342,19 +344,39 @@
       }
     }
 
+    // --- ブラウザ通知 ---
+    function requestNotificationPermission() {
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+    }
+
+    function sendPushNotification(msg) {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('🍅 ポモドーロタイマー', { body: msg });
+      }
+    }
+
     function showNotification(msg) {
       notification.textContent  = msg;
       notification.classList.add('visible');
       setTimeout(() => notification.classList.remove('visible'), 4000);
     }
 
+    // --- タイマーコア (Date.now() ベース) ---
+    // setInterval は1秒ごとに「実際の残り時間」を endTime から計算する。
+    // バックグラウンドで setInterval が遅延しても、復帰時に正しい残り時間になる。
     function tick() {
-      if (remaining > 0) {
-        remaining--;
+      if (!endTime) return;
+      const newRemaining = Math.max(0, Math.round((endTime - Date.now()) / 1000));
+      if (newRemaining !== remaining) {
+        remaining = newRemaining;
         updateDisplay();
-      } else {
+      }
+      if (remaining <= 0) {
         clearInterval(intervalId);
-        isRunning = false;
+        intervalId = null;
+        isRunning  = false;
         onTimerEnd();
       }
     }
@@ -366,14 +388,18 @@
         isFocus      = false;
         totalSeconds = isLongBreak ? LONG_BREAK_DURATION : BREAK_DURATION;
         remaining    = totalSeconds;
+        const msg = isLongBreak ? 'お疲れ様！長めの休憩を取りましょう。' : '休憩タイムです！少し休んで下さい。';
         playBeep('break');
-        showNotification(isLongBreak ? '🎉 お疲れ様！長めの休憩を取りましょう。' : '☕ 休憩タイムです！少し休んで下さい。');
+        showNotification((isLongBreak ? '🎉 ' : '☕ ') + msg);
+        sendPushNotification(msg);
       } else {
         isFocus      = true;
         totalSeconds = FOCUS_DURATION;
         remaining    = totalSeconds;
+        const msg = '集中タイム開始！頑張りましょう！';
         playBeep('focus');
-        showNotification('✏️ 集中タイム開始！頑張りましょう！');
+        showNotification('✏️ ' + msg);
+        sendPushNotification(msg);
       }
       updateModeUI();
       updateDisplay();
@@ -384,24 +410,29 @@
 
     function startTimer() {
       if (isRunning) return;
-      isRunning      = true;
+      isRunning = true;
+      endTime   = Date.now() + remaining * 1000; // 終了時刻を絶対時刻で記録
       btnStartPause.textContent = '一時停止';
-      intervalId = setInterval(tick, 1000);
+      intervalId = setInterval(tick, 500); // 0.5秒ごとにチェック（精度向上）
     }
 
     function pauseTimer() {
       isRunning = false;
       clearInterval(intervalId);
+      intervalId = null;
+      endTime    = null;
       btnStartPause.textContent = '再スタート';
     }
 
     function resetTimer() {
       clearInterval(intervalId);
+      intervalId   = null;
       isRunning    = false;
       isFocus      = true;
       sessionsDone = 0;
       totalSeconds = FOCUS_DURATION;
       remaining    = FOCUS_DURATION;
+      endTime      = null;
       btnStartPause.textContent = 'スタート';
       btnStartPause.classList.remove('break-active');
       updateModeUI();
@@ -409,10 +440,27 @@
       notification.classList.remove('visible');
     }
 
+    // --- Page Visibility API ---
+    // 画面が再表示されたとき、バックグラウンド中に経過した時間を即座に補正する
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && isRunning && endTime) {
+        const newRemaining = Math.max(0, Math.round((endTime - Date.now()) / 1000));
+        remaining = newRemaining;
+        updateDisplay();
+        if (remaining <= 0) {
+          clearInterval(intervalId);
+          intervalId = null;
+          isRunning  = false;
+          onTimerEnd();
+        }
+      }
+    });
+
     btnStartPause.addEventListener('click', () => {
       if (isRunning) {
         pauseTimer();
       } else {
+        requestNotificationPermission();
         startTimer();
       }
     });
