@@ -45,9 +45,13 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 12px;
+    gap: 14px;
   }
-  .icon { font-size: clamp(30px, 12vw, 44px); line-height: 1; }
+  .icon { color: var(--fg); line-height: 0; }
+  .icon svg {
+    width: clamp(34px, 13vw, 48px);
+    height: clamp(34px, 13vw, 48px);
+  }
   .temp {
     font-size: clamp(34px, 16vw, 56px);
     font-weight: 300;
@@ -84,18 +88,30 @@
   const LAT = 33.57;
   const LON = 130.40;
 
-  // WMO天気コード → 表示
+  // モノクロ線画アイコン(色は文字色に自動追従)
+  const S = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">';
+  const ICONS = {
+    sun: S + '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>',
+    cloudsun: S + '<path d="M12 2v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="M20 12h2"/><path d="m19.07 4.93-1.41 1.41"/><path d="M15.947 12.65a4 4 0 0 0-5.925-4.128"/><path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z"/></svg>',
+    cloud: S + '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>',
+    fog: S + '<path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M16 17H7"/><path d="M17 21H9"/></svg>',
+    rain: S + '<path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M16 14v6"/><path d="M8 14v6"/><path d="M12 16v6"/></svg>',
+    snow: S + '<path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M8 15h.01"/><path d="M8 19h.01"/><path d="M12 17h.01"/><path d="M12 21h.01"/><path d="M16 15h.01"/><path d="M16 19h.01"/></svg>',
+    thunder: S + '<path d="M6 16.326A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 .5 8.973"/><path d="m13 12-3 5h4l-3 5"/></svg>'
+  };
+
+  // WMO天気コード → [アイコン, 表示名]
   const WEATHER = {
-    0:  ["☀️", "快晴"],   1:  ["🌤️", "晴れ"],   2:  ["⛅", "晴れ時々曇り"],
-    3:  ["☁️", "曇り"],   45: ["🌫️", "霧"],     48: ["🌫️", "霧氷"],
-    51: ["🌦️", "霧雨"],   53: ["🌦️", "霧雨"],   55: ["🌧️", "強い霧雨"],
-    61: ["🌧️", "小雨"],   63: ["🌧️", "雨"],     65: ["🌧️", "大雨"],
-    66: ["🌧️", "着氷性の雨"], 67: ["🌧️", "着氷性の雨"],
-    71: ["🌨️", "小雪"],   73: ["🌨️", "雪"],     75: ["❄️", "大雪"],
-    77: ["❄️", "細氷"],   80: ["🌦️", "にわか雨"], 81: ["🌧️", "にわか雨"],
-    82: ["⛈️", "激しいにわか雨"],
-    85: ["🌨️", "にわか雪"], 86: ["🌨️", "強いにわか雪"],
-    95: ["⛈️", "雷雨"],   96: ["⛈️", "雷雨(ひょう)"], 99: ["⛈️", "激しい雷雨"]
+    0:  ["sun", "快晴"],      1:  ["sun", "晴れ"],      2:  ["cloudsun", "晴れ時々曇り"],
+    3:  ["cloud", "曇り"],    45: ["fog", "霧"],        48: ["fog", "霧氷"],
+    51: ["rain", "霧雨"],     53: ["rain", "霧雨"],     55: ["rain", "強い霧雨"],
+    61: ["rain", "小雨"],     63: ["rain", "雨"],       65: ["rain", "大雨"],
+    66: ["rain", "着氷性の雨"], 67: ["rain", "着氷性の雨"],
+    71: ["snow", "小雪"],     73: ["snow", "雪"],       75: ["snow", "大雪"],
+    77: ["snow", "細氷"],     80: ["rain", "にわか雨"], 81: ["rain", "にわか雨"],
+    82: ["thunder", "激しいにわか雨"],
+    85: ["snow", "にわか雪"], 86: ["snow", "強いにわか雪"],
+    95: ["thunder", "雷雨"],  96: ["thunder", "雷雨(ひょう)"], 99: ["thunder", "激しい雷雨"]
   };
 
   async function load() {
@@ -107,11 +123,11 @@
       const res = await fetch(url);
       if (!res.ok) throw new Error(res.status);
       const d = await res.json();
-      const [icon, desc] = WEATHER[d.current.weather_code] || ["🌡️", "—"];
+      const [icon, desc] = WEATHER[d.current.weather_code] || ["cloud", "—"];
       document.getElementById("card").innerHTML = `
         <div class="place">FUKUOKA</div>
         <div class="now">
-          <div class="icon">${icon}</div>
+          <div class="icon">${ICONS[icon]}</div>
           <div class="temp">${Math.round(d.current.temperature_2m)}<small>°C</small></div>
         </div>
         <div class="desc">${desc}</div>
@@ -130,4 +146,3 @@
 </script>
 </body>
 </html>
-
