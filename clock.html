@@ -7,25 +7,24 @@
 <style>
   :root {
     --bg: #ffffff;
-    --fg: #37352f;      /* Notionライトモードの文字色 */
-    --sub: #9b9a97;     /* Notionのグレー文字 */
-    --bar: #e3e2e0;     /* 秒バーの下地 */
-    --accent: #37352f;  /* 秒バー本体 */
+    --fg: #37352f;
+    --sub: #9b9a97;
+    --line: #e3e2e0;
+    --bar: #e3e2e0;
+    --accent: #37352f;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #191919;    /* Notionダークモードの背景色 */
+      --bg: #191919;
       --fg: #d4d4d4;
       --sub: #7f7f7f;
+      --line: #2f2f2f;
       --bar: #2f2f2f;
       --accent: #d4d4d4;
     }
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body {
-    height: 100%;
-    background: var(--bg);
-  }
+  html, body { height: 100%; background: var(--bg); }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans",
                  "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", sans-serif;
@@ -34,60 +33,72 @@
     align-items: center;
     justify-content: center;
   }
-  .clock {
-    text-align: center;
-    padding: 8px 16px;
-    width: 100%;
-    max-width: 360px;
-  }
-  .date {
-    font-size: clamp(11px, 4vw, 14px);
+  .card { width: 100%; max-width: 320px; padding: 10px 16px; text-align: center; }
+  .label {
+    font-size: 12px;
     color: var(--sub);
     letter-spacing: 0.14em;
-    margin-bottom: 2px;
+    margin-bottom: 4px;
+  }
+  .main {
+    height: 84px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
   }
   .time {
-    font-size: clamp(36px, 18vw, 64px);
+    font-size: 52px;
     font-weight: 300;
     letter-spacing: 0.04em;
     font-variant-numeric: tabular-nums;
-    line-height: 1.15;
+    line-height: 1.1;
   }
-  .time .colon {
-    animation: blink 2s step-end infinite;
-  }
-  @keyframes blink {
-    50% { opacity: 0.25; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .time .colon { animation: none; }
-  }
-  /* 1分かけて満ちる秒バー */
+  .time .colon { animation: blink 2s step-end infinite; }
+  @keyframes blink { 50% { opacity: 0.25; } }
+  @media (prefers-reduced-motion: reduce) { .time .colon { animation: none; } }
   .seconds {
-    margin-top: 10px;
+    margin-top: 8px;
     height: 2px;
-    width: 100%;
+    width: 78%;
     background: var(--bar);
     border-radius: 1px;
     overflow: hidden;
   }
-  .seconds > div {
-    height: 100%;
-    width: 0%;
-    background: var(--accent);
-    border-radius: 1px;
+  .seconds > div { height: 100%; width: 0%; background: var(--accent); border-radius: 1px; }
+  .foot {
+    display: flex;
+    justify-content: center;
+    gap: 18px;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--sub);
+    font-variant-numeric: tabular-nums;
   }
+  .foot b { color: var(--fg); font-weight: 500; }
 </style>
 </head>
 <body>
-  <div class="clock">
-    <div class="date" id="date">&nbsp;</div>
-    <div class="time" id="time">--<span class="colon">:</span>--</div>
-    <div class="seconds"><div id="bar"></div></div>
+  <div class="card">
+    <div class="label" id="date">&nbsp;</div>
+    <div class="main">
+      <div class="time" id="time">--<span class="colon">:</span>--</div>
+      <div class="seconds"><div id="bar"></div></div>
+    </div>
+    <div class="foot" id="foot">&nbsp;</div>
   </div>
 <script>
   const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const pad = n => String(n).padStart(2, "0");
+
+  function isoWeek(d) {
+    const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+    const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+    return Math.ceil(((t - y0) / 86400000 + 1) / 7);
+  }
 
   function tick() {
     const now = new Date();
@@ -97,6 +108,12 @@
       `${pad(now.getHours())}<span class="colon">:</span>${pad(now.getMinutes())}`;
     const sec = now.getSeconds() + now.getMilliseconds() / 1000;
     document.getElementById("bar").style.width = (sec / 60 * 100) + "%";
+
+    const y0 = new Date(now.getFullYear(), 0, 1);
+    const y1 = new Date(now.getFullYear() + 1, 0, 1);
+    const pct = Math.floor((now - y0) / (y1 - y0) * 100);
+    document.getElementById("foot").innerHTML =
+      `<span>第<b>${isoWeek(now)}</b>週</span><span>今年 <b>${pct}%</b> 経過</span>`;
   }
 
   tick();
