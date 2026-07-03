@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clock</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #37352f;      /* Notionライトモードの文字色 */
+    --sub: #9b9a97;     /* Notionのグレー文字 */
+    --bar: #e3e2e0;     /* 秒バーの下地 */
+    --accent: #37352f;  /* 秒バー本体 */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #191919;    /* Notionダークモードの背景色 */
+      --fg: #d4d4d4;
+      --sub: #7f7f7f;
+      --bar: #2f2f2f;
+      --accent: #d4d4d4;
+    }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    background: var(--bg);
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans",
+                 "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", sans-serif;
+    color: var(--fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .clock {
+    text-align: center;
+    padding: 8px 16px;
+    width: 100%;
+    max-width: 360px;
+  }
+  .date {
+    font-size: clamp(11px, 4vw, 14px);
+    color: var(--sub);
+    letter-spacing: 0.14em;
+    margin-bottom: 2px;
+  }
+  .time {
+    font-size: clamp(36px, 18vw, 64px);
+    font-weight: 300;
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.15;
+  }
+  .time .colon {
+    animation: blink 2s step-end infinite;
+  }
+  @keyframes blink {
+    50% { opacity: 0.25; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .time .colon { animation: none; }
+  }
+  /* 1分かけて満ちる秒バー */
+  .seconds {
+    margin-top: 10px;
+    height: 2px;
+    width: 100%;
+    background: var(--bar);
+    border-radius: 1px;
+    overflow: hidden;
+  }
+  .seconds > div {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    border-radius: 1px;
+  }
+</style>
+</head>
+<body>
+  <div class="clock">
+    <div class="date" id="date">&nbsp;</div>
+    <div class="time" id="time">--<span class="colon">:</span>--</div>
+    <div class="seconds"><div id="bar"></div></div>
+  </div>
+<script>
+  const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const pad = n => String(n).padStart(2, "0");
+
+  function tick() {
+    const now = new Date();
+    document.getElementById("date").textContent =
+      `${now.getFullYear()}/${pad(now.getMonth() + 1)}/${pad(now.getDate())} (${WEEKDAYS[now.getDay()]})`;
+    document.getElementById("time").innerHTML =
+      `${pad(now.getHours())}<span class="colon">:</span>${pad(now.getMinutes())}`;
+    const sec = now.getSeconds() + now.getMilliseconds() / 1000;
+    document.getElementById("bar").style.width = (sec / 60 * 100) + "%";
+  }
+
+  tick();
+  setInterval(tick, 250);
+</script>
+</body>
+</html>
