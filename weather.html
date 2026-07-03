@@ -29,66 +29,56 @@
     align-items: center;
     justify-content: center;
   }
-  .card {
-    width: 100%;
-    max-width: 360px;
-    padding: 10px 16px;
-    text-align: center;
-  }
-  .place {
-    font-size: clamp(11px, 4vw, 13px);
+  .card { width: 100%; max-width: 320px; padding: 10px 16px; text-align: center; }
+  .label {
+    font-size: 12px;
     color: var(--sub);
     letter-spacing: 0.14em;
     margin-bottom: 4px;
   }
-  .now {
+  .main {
+    height: 84px;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 14px;
   }
+  .now { display: flex; align-items: center; justify-content: center; gap: 12px; }
   .icon { color: var(--fg); line-height: 0; }
-  .icon svg {
-    width: clamp(34px, 13vw, 48px);
-    height: clamp(34px, 13vw, 48px);
-  }
+  .icon svg { width: 40px; height: 40px; }
   .temp {
-    font-size: clamp(34px, 16vw, 56px);
+    font-size: 52px;
     font-weight: 300;
     font-variant-numeric: tabular-nums;
     line-height: 1.1;
   }
   .temp small { font-size: 0.45em; font-weight: 400; color: var(--sub); }
-  .desc {
-    font-size: clamp(12px, 4.5vw, 15px);
-    margin-top: 2px;
-  }
-  .range {
+  .desc { font-size: 13px; margin-top: 2px; }
+  .foot {
     display: flex;
     justify-content: center;
     gap: 18px;
     margin-top: 10px;
     padding-top: 8px;
     border-top: 1px solid var(--line);
-    font-size: clamp(11px, 4vw, 13px);
+    font-size: 12px;
     color: var(--sub);
     font-variant-numeric: tabular-nums;
   }
-  .range b { color: var(--fg); font-weight: 500; }
+  .foot b { color: var(--fg); font-weight: 500; }
   .error { color: var(--sub); font-size: 13px; }
 </style>
 </head>
 <body>
   <div class="card" id="card">
-    <div class="place">FUKUOKA</div>
-    <div class="error" id="loading">読み込み中…</div>
+    <div class="label">FUKUOKA</div>
+    <div class="main"><div class="error" id="loading">読み込み中…</div></div>
   </div>
 <script>
   // 場所を変えたいときはここの緯度・経度を書き換えてください(現在: 福岡市中央区付近)
   const LAT = 33.57;
   const LON = 130.40;
 
-  // モノクロ線画アイコン(色は文字色に自動追従)
   const S = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">';
   const ICONS = {
     sun: S + '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>',
@@ -100,7 +90,6 @@
     thunder: S + '<path d="M6 16.326A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 .5 8.973"/><path d="m13 12-3 5h4l-3 5"/></svg>'
   };
 
-  // WMO天気コード → [アイコン, 表示名]
   const WEATHER = {
     0:  ["sun", "快晴"],      1:  ["sun", "晴れ"],      2:  ["cloudsun", "晴れ時々曇り"],
     3:  ["cloud", "曇り"],    45: ["fog", "霧"],        48: ["fog", "霧氷"],
@@ -125,13 +114,15 @@
       const d = await res.json();
       const [icon, desc] = WEATHER[d.current.weather_code] || ["cloud", "—"];
       document.getElementById("card").innerHTML = `
-        <div class="place">FUKUOKA</div>
-        <div class="now">
-          <div class="icon">${ICONS[icon]}</div>
-          <div class="temp">${Math.round(d.current.temperature_2m)}<small>°C</small></div>
+        <div class="label">FUKUOKA</div>
+        <div class="main">
+          <div class="now">
+            <div class="icon">${ICONS[icon]}</div>
+            <div class="temp">${Math.round(d.current.temperature_2m)}<small>°C</small></div>
+          </div>
+          <div class="desc">${desc}</div>
         </div>
-        <div class="desc">${desc}</div>
-        <div class="range">
+        <div class="foot">
           <span>最高 <b>${Math.round(d.daily.temperature_2m_max[0])}°</b></span>
           <span>最低 <b>${Math.round(d.daily.temperature_2m_min[0])}°</b></span>
           <span>降水 <b>${d.daily.precipitation_probability_max[0]}%</b></span>
