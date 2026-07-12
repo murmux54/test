@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Google Trends</title>
+<style>
+  :root {
+    --bg: #191919;
+    --text: #dfdedb;
+    --text-sub: #9b9a97;
+    --text-faint: #6f6e6b;
+    --border: #2f2f2f;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+      "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI",
+      Meiryo, sans-serif;
+    font-size: 12px;
+    line-height: 1.5;
+    padding: 14px 16px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .widget { width: 100%; max-width: 300px; }
+
+  /* ---- ヘッダー(天気ウィジェットのFUKUOKA表記と同じ雰囲気) ---- */
+  .label {
+    text-align: center;
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    color: var(--text-sub);
+    margin-bottom: 10px;
+  }
+
+  /* ---- ランキング ---- */
+  .list { display: flex; flex-direction: column; }
+
+  .item {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 5px 2px;
+    border-bottom: 1px solid var(--border);
+    text-decoration: none;
+    color: var(--text);
+  }
+  .item:last-child { border-bottom: none; }
+  .item:hover .word { color: #ffffff; }
+
+  .rank {
+    flex: none;
+    width: 1.2em;
+    text-align: right;
+    font-size: 13px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-faint);
+  }
+  .item:nth-child(1) .rank { color: var(--text); }
+
+  .word {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .traffic {
+    flex: none;
+    font-size: 10px;
+    color: var(--text-faint);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .foot {
+    margin-top: 8px;
+    text-align: center;
+    font-size: 9px;
+    color: var(--text-faint);
+  }
+
+  .msg {
+    padding: 20px 0;
+    text-align: center;
+    color: var(--text-sub);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .list { animation: fadein 0.25s ease; }
+    @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+  }
+</style>
+</head>
+<body>
+
+<div class="widget">
+  <div class="label">GOOGLE TRENDS &middot; JP</div>
+  <div id="app"><div class="msg">読み込み中…</div></div>
+  <div class="foot" id="updated"></div>
+</div>
+
+<script>
+/* ================= 設定 ================= */
+
+// GAS(トレンド用プロジェクト)のウェブアプリURLをここに貼る
+// ※前後の半角の引用符 " " は消さないこと!
+const GAS_URL = "https://script.google.com/macros/s/AKfycbwNkoJzdCVS-p7HLPk_aCas2y6YDxwK18I8RkYpgMeB5FZ82S1Y2kszulIhotDx9_iw/exec";
+
+// 表示する件数
+const SHOW_ITEMS = 5;
+
+// タップでGoogle検索を開くか(true/false)
+const CLICKABLE = true;
+
+// 自動更新の間隔(分)
+const REFRESH_MINUTES = 15;
+
+/* ======================================== */
+
+function fmtTime(d) {
+  return d.getHours() + ":" + String(d.getMinutes()).padStart(2, "0");
+}
+
+function esc(s) {
+  const div = document.createElement("div");
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+function render(data) {
+  const items = (data.items || []).slice(0, SHOW_ITEMS);
+
+  if (items.length === 0) {
+    document.getElementById("app").innerHTML =
+      '<div class="msg">トレンドを取得できませんでした</div>';
+    return;
+  }
+
+  let html = '<div class="list">';
+  items.forEach(function (it, i) {
+    const inner =
+      '<span class="rank">' + (i + 1) + '</span>' +
+      '<span class="word">' + esc(it.title) + '</span>' +
+      (it.traffic ? '<span class="traffic">' + esc(it.traffic) + '</span>' : '');
+
+    if (CLICKABLE) {
+      const q = encodeURIComponent(it.title);
+      html += '<a class="item" target="_blank" rel="noopener" ' +
+              'href="https://www.google.com/search?q=' + q + '">' + inner + '</a>';
+    } else {
+      html += '<div class="item">' + inner + '</div>';
+    }
+  });
+  html += '</div>';
+
+  document.getElementById("app").innerHTML = html;
+  document.getElementById("updated").textContent = "更新 " + fmtTime(new Date());
+}
+
+async function load() {
+  try {
+    const res = await fetch(GAS_URL);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    render(data);
+  } catch (err) {
+    document.getElementById("app").innerHTML =
+      '<div class="msg">取得エラー。GAS_URLを確認してください。<br>(' +
+      esc(String(err)) + ')</div>';
+  }
+}
+
+load();
+setInterval(load, REFRESH_MINUTES * 60 * 1000);
+</script>
+
+</body>
+</html>
