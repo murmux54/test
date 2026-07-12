@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #37352f;
+    --sub: #9b9a97;
+    --line: #e3e2e0;
+    --bar: #e3e2e0;
+    --accent: #37352f;
+    --faint: #b8b7b4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #191919;
+      --fg: #d4d4d4;
+      --sub: #7f7f7f;
+      --line: #2f2f2f;
+      --bar: #2f2f2f;
+      --accent: #d4d4d4;
+      --faint: #6f6e6b;
+    }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; background: var(--bg); }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans",
+                 "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", sans-serif;
+    color: var(--fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ==== 4枚グリッド ==== */
+  .dash {
+    width: 100%;
+    max-width: 1240px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .card {
+    padding: 12px 16px;
+    text-align: center;
+    border-left: 1px solid var(--line);
+  }
+  .card:first-child { border-left: none; }
+
+  /* 各段の高さを固定して、4枚のラインを完全に揃える */
+  .label {
+    height: 18px;
+    font-size: 12px;
+    color: var(--sub);
+    letter-spacing: 0.14em;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .main {
+    height: 116px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .foot {
+    display: flex;
+    justify-content: center;
+    gap: 18px;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--sub);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .foot b { color: var(--fg); font-weight: 500; }
+  .error { color: var(--sub); font-size: 13px; }
+
+  /* ==== 時計 ==== */
+  .time {
+    font-size: 52px;
+    font-weight: 300;
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+  .time .colon { animation: blink 2s step-end infinite; }
+  @keyframes blink { 50% { opacity: 0.25; } }
+  @media (prefers-reduced-motion: reduce) { .time .colon { animation: none; } }
+  .seconds {
+    margin-top: 8px;
+    height: 2px;
+    width: 78%;
+    background: var(--bar);
+    border-radius: 1px;
+    overflow: hidden;
+  }
+  .seconds > div { height: 100%; width: 0%; background: var(--accent); border-radius: 1px; }
+
+  /* ==== 天気 ==== */
+  .now { display: flex; align-items: center; justify-content: center; gap: 12px; }
+  .icon { color: var(--fg); line-height: 0; }
+  .icon svg { width: 40px; height: 40px; }
+  .temp {
+    font-size: 52px;
+    font-weight: 300;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+  .temp small { font-size: 0.45em; font-weight: 400; color: var(--sub); }
+  .desc { font-size: 13px; margin-top: 2px; }
+
+  /* ==== 日の出・日の入り ==== */
+  .sky { width: 168px; display: block; }
+  .times {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin-top: 2px;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+  .times .t { display: flex; align-items: center; gap: 5px; }
+  .times svg { width: 16px; height: 16px; color: var(--sub); }
+
+  /* ==== トレンド ==== */
+  .tlist { width: 100%; display: flex; flex-direction: column; text-align: left; }
+  .titem {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 2px 2px 3px;
+    border-bottom: 1px solid var(--line);
+    text-decoration: none;
+    color: var(--fg);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .titem:last-child { border-bottom: none; }
+  .titem .rank {
+    flex: none;
+    width: 1.1em;
+    text-align: right;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--faint);
+  }
+  .titem:first-child .rank { color: var(--fg); }
+  .titem .word {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .titem .traffic { flex: none; font-size: 10px; color: var(--faint); }
+
+  /* ==== レスポンシブ: 2×2 → 1列 ==== */
+  @media (max-width: 900px) {
+    .dash { grid-template-columns: repeat(2, 1fr); row-gap: 16px; }
+    .card:nth-child(3) { border-left: none; }
+  }
+  @media (max-width: 480px) {
+    .dash { grid-template-columns: 1fr; }
+    .card { border-left: none; }
+  }
+</style>
+</head>
+<body>
+<div class="dash">
+
+  <!-- 1. 時計 -->
+  <div class="card">
+    <div class="label" id="c-date">&nbsp;</div>
+    <div class="main">
+      <div class="time" id="c-time">--<span class="colon">:</span>--</div>
+      <div class="seconds"><div id="c-bar"></div></div>
+    </div>
+    <div class="foot" id="c-foot">&nbsp;</div>
+  </div>
+
+  <!-- 2. 天気 -->
+  <div class="card">
+    <div class="label">FUKUOKA</div>
+    <div class="main" id="w-main"><div class="error">読み込み中…</div></div>
+    <div class="foot" id="w-foot">&nbsp;</div>
+  </div>
+
+  <!-- 3. 日の出・日の入り -->
+  <div class="card">
+    <div class="label">FUKUOKA</div>
+    <div class="main" id="s-main"><div class="error">読み込み中…</div></div>
+    <div class="foot" id="s-foot">&nbsp;</div>
+  </div>
+
+  <!-- 4. Googleトレンド -->
+  <div class="card">
+    <div class="label">GOOGLE TRENDS &middot; JP</div>
+    <div class="main" id="t-main"><div class="error">読み込み中…</div></div>
+    <div class="foot" id="t-foot">&nbsp;</div>
+  </div>
+
+</div>
+<script>
+/* ================= 設定 ================= */
+
+// 場所(福岡市中央区付近)
+const LAT = 33.57;
+const LON = 130.40;
+
+// トレンド用GAS(トレンドプロジェクト)のウェブアプリURLをここに貼る
+// ※前後の半角の引用符 " " は消さないこと!
+const TRENDS_GAS_URL = "https://script.google.com/macros/s/AKfycbwNkoJzdCVS-p7HLPk_aCas2y6YDxwK18I8RkYpgMeB5FZ82S1Y2kszulIhotDx9_iw/exec";
+
+// トレンド表示件数(高さ固定のため5推奨)
+const TRENDS_SHOW = 5;
+
+// トレンドのタップでGoogle検索を開くか
+const TRENDS_CLICKABLE = true;
+
+/* ======================================== */
+
+const pad = n => String(n).padStart(2, "0");
+
+function esc(s) {
+  const div = document.createElement("div");
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+/* ==== 1. 時計 ==== */
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function isoWeek(d) {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+  const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return Math.ceil(((t - y0) / 86400000 + 1) / 7);
+}
+
+function tick() {
+  const now = new Date();
+  document.getElementById("c-date").textContent =
+    `${now.getFullYear()}/${pad(now.getMonth() + 1)}/${pad(now.getDate())} (${WEEKDAYS[now.getDay()]})`;
+  document.getElementById("c-time").innerHTML =
+    `${pad(now.getHours())}<span class="colon">:</span>${pad(now.getMinutes())}`;
+  const sec = now.getSeconds() + now.getMilliseconds() / 1000;
+  document.getElementById("c-bar").style.width = (sec / 60 * 100) + "%";
+
+  const y0 = new Date(now.getFullYear(), 0, 1);
+  const y1 = new Date(now.getFullYear() + 1, 0, 1);
+  const pct = Math.floor((now - y0) / (y1 - y0) * 100);
+  document.getElementById("c-foot").innerHTML =
+    `<span>第<b>${isoWeek(now)}</b>週</span><span>今年 <b>${pct}%</b> 経過</span>`;
+}
+tick();
+setInterval(tick, 250);
+
+/* ==== 2. 天気 ==== */
+const S = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">';
+const ICONS = {
+  sun: S + '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>',
+  cloudsun: S + '<path d="M12 2v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="M20 12h2"/><path d="m19.07 4.93-1.41 1.41"/><path d="M15.947 12.65a4 4 0 0 0-5.925-4.128"/><path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z"/></svg>',
+  cloud: S + '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>',
+  fog: S + '<path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M16 17H7"/><path d="M17 21H9"/></svg>',
+  rain: S + '<path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M16 14v6"/><path d="M8 14v6"/><path d="M12 16v6"/></svg>',
+  snow: S + '<path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M8 15h.01"/><path d="M8 19h.01"/><path d="M12 17h.01"/><path d="M12 21h.01"/><path d="M16 15h.01"/><path d="M16 19h.01"/></svg>',
+  thunder: S + '<path d="M6 16.326A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 .5 8.973"/><path d="m13 12-3 5h4l-3 5"/></svg>'
+};
+
+const WEATHER = {
+  0:  ["sun", "快晴"],      1:  ["sun", "晴れ"],      2:  ["cloudsun", "晴れ時々曇り"],
+  3:  ["cloud", "曇り"],    45: ["fog", "霧"],        48: ["fog", "霧氷"],
+  51: ["rain", "霧雨"],     53: ["rain", "霧雨"],     55: ["rain", "強い霧雨"],
+  61: ["rain", "小雨"],     63: ["rain", "雨"],       65: ["rain", "大雨"],
+  66: ["rain", "着氷性の雨"], 67: ["rain", "着氷性の雨"],
+  71: ["snow", "小雪"],     73: ["snow", "雪"],       75: ["snow", "大雪"],
+  77: ["snow", "細氷"],     80: ["rain", "にわか雨"], 81: ["rain", "にわか雨"],
+  82: ["thunder", "激しいにわか雨"],
+  85: ["snow", "にわか雪"], 86: ["snow", "強いにわか雪"],
+  95: ["thunder", "雷雨"],  96: ["thunder", "雷雨(ひょう)"], 99: ["thunder", "激しい雷雨"]
+};
+
+async function loadWeather() {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}`
+    + `&current=temperature_2m,weather_code`
+    + `&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max`
+    + `&timezone=Asia%2FTokyo&forecast_days=1`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(res.status);
+    const d = await res.json();
+    const [icon, desc] = WEATHER[d.current.weather_code] || ["cloud", "—"];
+    document.getElementById("w-main").innerHTML = `
+      <div class="now">
+        <div class="icon">${ICONS[icon]}</div>
+        <div class="temp">${Math.round(d.current.temperature_2m)}<small>°C</small></div>
+      </div>
+      <div class="desc">${desc}</div>`;
+    document.getElementById("w-foot").innerHTML = `
+      <span>最高 <b>${Math.round(d.daily.temperature_2m_max[0])}°</b></span>
+      <span>最低 <b>${Math.round(d.daily.temperature_2m_min[0])}°</b></span>
+      <span>降水 <b>${d.daily.precipitation_probability_max[0]}%</b></span>`;
+  } catch (e) {
+    document.getElementById("w-main").innerHTML =
+      '<div class="error">天気を取得できませんでした</div>';
+  }
+}
+loadWeather();
+setInterval(loadWeather, 30 * 60 * 1000);
+
+/* ==== 3. 日の出・日の入り ==== */
+const RISE = S + '<path d="M12 2v6"/><path d="m4.93 10.93 1.41 1.41"/><path d="M2 18h2"/><path d="M20 18h2"/><path d="m19.07 10.93-1.41 1.41"/><path d="M22 22H2"/><path d="m8 6 4-4 4 4"/><path d="M16 18a4 4 0 0 0-8 0"/></svg>';
+const SET  = S + '<path d="M12 10V2"/><path d="m4.93 10.93 1.41 1.41"/><path d="M2 18h2"/><path d="M20 18h2"/><path d="m19.07 10.93-1.41 1.41"/><path d="M22 22H2"/><path d="m16 6-4 4-4-4"/><path d="M16 18a4 4 0 0 0-8 0"/></svg>';
+
+const hm = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+let sunrise = null, sunset = null;
+
+function drawSky() {
+  const now = new Date();
+  const t = (now - sunrise) / (sunset - sunrise);
+  const day = t >= 0 && t <= 1;
+  const tc = Math.min(1, Math.max(0, t));
+  const x = 100 - 82 * Math.cos(Math.PI * tc);
+  const y = 66 - 50 * Math.sin(Math.PI * tc);
+  return `
+    <svg class="sky" viewBox="0 0 200 74" xmlns="http://www.w3.org/2000/svg">
+      <path d="M18,66 A82,50 0 0 1 182,66" fill="none"
+            stroke="var(--line)" stroke-width="1.5" stroke-dasharray="3 4"/>
+      <line x1="6" y1="66" x2="194" y2="66" stroke="var(--sub)" stroke-width="1.5"/>
+      ${day ? `
+        <circle cx="${x}" cy="${y}" r="5" fill="var(--bg)"
+                stroke="var(--fg)" stroke-width="1.5"/>
+        <g stroke="var(--fg)" stroke-width="1.2" stroke-linecap="round">
+          <line x1="${x}" y1="${y-8.5}" x2="${x}" y2="${y-11.5}"/>
+          <line x1="${x}" y1="${y+8.5}" x2="${x}" y2="${y+11.5}"/>
+          <line x1="${x-8.5}" y1="${y}" x2="${x-11.5}" y2="${y}"/>
+          <line x1="${x+8.5}" y1="${y}" x2="${x+11.5}" y2="${y}"/>
+        </g>` : `
+        <path d="M103 32a8 8 0 1 1-8-11 6.2 6.2 0 0 0 8 11Z" fill="none"
+              stroke="var(--sub)" stroke-width="1.5" stroke-linejoin="round"/>`}
+    </svg>`;
+}
+
+function renderSun() {
+  if (!sunrise) return;
+  const ms = sunset - sunrise;
+  const h = Math.floor(ms / 3600000);
+  const m = Math.round((ms % 3600000) / 60000);
+  document.getElementById("s-main").innerHTML = `
+    ${drawSky()}
+    <div class="times">
+      <span class="t">${RISE}${hm(sunrise)}</span>
+      <span class="t">${SET}${hm(sunset)}</span>
+    </div>`;
+  document.getElementById("s-foot").innerHTML =
+    `<span>昼の長さ <b>${h}時間${pad(m)}分</b></span>`;
+}
+
+async function loadSun() {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}`
+    + `&daily=sunrise,sunset&timezone=Asia%2FTokyo&forecast_days=1`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(res.status);
+    const d = await res.json();
+    sunrise = new Date(d.daily.sunrise[0]);
+    sunset = new Date(d.daily.sunset[0]);
+    renderSun();
+  } catch (e) {
+    document.getElementById("s-main").innerHTML =
+      '<div class="error">データを取得できませんでした</div>';
+  }
+}
+loadSun();
+setInterval(renderSun, 60 * 1000);
+setInterval(loadSun, 6 * 60 * 60 * 1000);
+
+/* ==== 4. Googleトレンド ==== */
+async function loadTrends() {
+  try {
+    const res = await fetch(TRENDS_GAS_URL);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    const items = (data.items || []).slice(0, TRENDS_SHOW);
+    if (items.length === 0) throw new Error("no items");
+
+    let html = '<div class="tlist">';
+    items.forEach(function (it, i) {
+      const inner =
+        '<span class="rank">' + (i + 1) + '</span>' +
+        '<span class="word">' + esc(it.title) + '</span>' +
+        (it.traffic ? '<span class="traffic">' + esc(it.traffic) + '</span>' : '');
+      if (TRENDS_CLICKABLE) {
+        const q = encodeURIComponent(it.title);
+        html += '<a class="titem" target="_blank" rel="noopener" ' +
+                'href="https://www.google.com/search?q=' + q + '">' + inner + '</a>';
+      } else {
+        html += '<div class="titem">' + inner + '</div>';
+      }
+    });
+    html += '</div>';
+
+    document.getElementById("t-main").innerHTML = html;
+    const now = new Date();
+    document.getElementById("t-foot").innerHTML =
+      '<span>更新 <b>' + hm(now) + '</b></span>';
+  } catch (err) {
+    document.getElementById("t-main").innerHTML =
+      '<div class="error">トレンドを取得できませんでした</div>';
+  }
+}
+loadTrends();
+setInterval(loadTrends, 15 * 60 * 1000);
+</script>
+</body>
+</html>
