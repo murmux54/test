@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>週間カレンダー</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --text: #37352f;
+    --text-sub: #787774;
+    --text-faint: #b8b7b4;
+    --border: #e9e9e7;
+    --today-bg: #f7f7f5;
+    --today-bar: #37352f;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+      "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI",
+      Meiryo, sans-serif;
+    font-size: 12px;
+    line-height: 1.5;
+    padding: 12px 14px 14px;
+  }
+
+  /* ---- ヘッダー ---- */
+  .head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .head .range {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .head .updated {
+    font-size: 10px;
+    color: var(--text-faint);
+  }
+
+  /* ---- 週グリッド ---- */
+  .week {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    border-top: 1px solid var(--border);
+    border-left: 1px solid var(--border);
+  }
+  .day {
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    min-height: 130px;
+    padding: 6px 6px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .day.today {
+    background: var(--today-bg);
+    box-shadow: inset 0 2px 0 var(--today-bar);
+  }
+
+  .day-head {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    margin-bottom: 2px;
+  }
+  .day-head .dow {
+    font-size: 10px;
+    color: var(--text-sub);
+  }
+  .day-head .date {
+    font-size: 14px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .day.today .day-head .dow::after {
+    content: " 今日";
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  /* ---- 予定チップ ---- */
+  .ev {
+    display: flex;
+    align-items: flex-start;
+    gap: 5px;
+    font-size: 11px;
+  }
+  .ev .dot {
+    flex: none;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    margin-top: 5px;
+    background: var(--text-faint);
+  }
+  .ev .body { min-width: 0; }
+  .ev .time {
+    color: var(--text-sub);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    display: block;
+  }
+  .ev .title {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .ev.allday .title { font-weight: 600; }
+
+  .empty {
+    color: var(--text-faint);
+    font-size: 10px;
+  }
+
+  .msg {
+    padding: 24px 0;
+    text-align: center;
+    color: var(--text-sub);
+    font-size: 12px;
+  }
+
+  /* ---- 狭い幅(スマホ・細い埋め込み)では縦並び ---- */
+  @media (max-width: 560px) {
+    .week {
+      grid-template-columns: 1fr;
+      border-left: none;
+      border-top: none;
+    }
+    .day {
+      border-right: none;
+      border-bottom: 1px solid var(--border);
+      min-height: 0;
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 2px 10px;
+      padding: 8px 2px;
+    }
+    .day.today { box-shadow: inset 3px 0 0 var(--today-bar); padding-left: 8px; }
+    .day-head { width: 64px; flex: none; margin: 0; }
+    .day .events { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 3px; }
+  }
+  @media (min-width: 561px) {
+    .day .events { display: contents; }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .week { animation: fadein 0.25s ease; }
+    @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+  }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <span class="range" id="range"></span>
+  <span class="updated" id="updated"></span>
+</div>
+<div id="app"><div class="msg">読み込み中…</div></div>
+
+<script>
+/* ================= 設定 ================= */
+
+// GASをデプロイして得た「ウェブアプリのURL」をここに貼る
+const GAS_URL = https://script.google.com/macros/s/AKfycbx4wczQOOC97gWKOnn3OWWwFCauN_xoXAHyGoo8jChxn-G9WYxex28sBbv2tiMCC8SeHQ/exec;
+
+// 週の起点: "today" = 今日から7日間 / "monday" = 今週の月曜から7日間
+const START_MODE = "today";
+
+// Googleカレンダーの色ID → グレースケール
+// (2=セージ, 4=フラミンゴ, 5=バナナ, 6=ミカン/パンプキン, 8=グラファイト)
+const COLOR_MAP = {
+  "":  "#9b9a97",  // 色未設定
+  "8": "#37352f",  // グラファイト … 最も濃く
+  "2": "#5f5e5b",  // セージ
+  "6": "#787774",  // パンプキン
+  "4": "#a5a29e",  // フラミンゴ
+  "5": "#c9c8c5"   // バナナ … 最も薄く
+};
+
+// 自動更新の間隔(分)
+const REFRESH_MINUTES = 10;
+
+/* ======================================== */
+
+const DOW = ["日", "月", "火", "水", "木", "金", "土"];
+
+function startOfDay(d) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function buildDays() {
+  const now = new Date();
+  let first = startOfDay(now);
+  if (START_MODE === "monday") {
+    const day = now.getDay();
+    const diff = (day === 0) ? -6 : 1 - day;
+    first = new Date(first.getFullYear(), first.getMonth(), first.getDate() + diff);
+  }
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    days.push(new Date(first.getFullYear(), first.getMonth(), first.getDate() + i));
+  }
+  return days;
+}
+
+function fmtTime(d) {
+  return d.getHours() + ":" + String(d.getMinutes()).padStart(2, "0");
+}
+
+function esc(s) {
+  const div = document.createElement("div");
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+function render(data) {
+  const days = buildDays();
+  const todayKey = startOfDay(new Date()).getTime();
+
+  // ヘッダーの期間表示
+  const a = days[0], b = days[6];
+  document.getElementById("range").textContent =
+    (a.getMonth() + 1) + "/" + a.getDate() + " – " +
+    (b.getMonth() + 1) + "/" + b.getDate();
+  const upd = new Date(data.updated);
+  document.getElementById("updated").textContent =
+    "更新 " + fmtTime(new Date());
+
+  const events = data.events.map(ev => ({
+    title: ev.title,
+    start: new Date(ev.start),
+    end: new Date(ev.end),
+    allDay: ev.allDay,
+    color: COLOR_MAP[ev.color] || COLOR_MAP[""]
+  }));
+
+  let html = '<div class="week">';
+  for (const day of days) {
+    const dayStart = day.getTime();
+    const dayEnd = dayStart + 86400000;
+
+    // この日に表示する予定を抽出
+    const todays = events.filter(ev => {
+      if (ev.allDay) {
+        // 終日予定は期間中の毎日に表示(endは翌日0時=排他的)
+        return ev.start.getTime() < dayEnd && ev.end.getTime() > dayStart;
+      }
+      return ev.start.getTime() >= dayStart && ev.start.getTime() < dayEnd;
+    }).sort((x, y) => {
+      if (x.allDay !== y.allDay) return x.allDay ? -1 : 1;
+      return x.start - y.start;
+    });
+
+    const isToday = dayStart === todayKey;
+    html += '<div class="day' + (isToday ? " today" : "") + '">';
+    html += '<div class="day-head"><span class="date">' + day.getDate() +
+            '</span><span class="dow">' + DOW[day.getDay()] + '</span></div>';
+    html += '<div class="events">';
+
+    if (todays.length === 0) {
+      html += '<span class="empty">予定なし</span>';
+    } else {
+      for (const ev of todays) {
+        html += '<div class="ev' + (ev.allDay ? " allday" : "") + '">' +
+                '<span class="dot" style="background:' + ev.color + '"></span>' +
+                '<span class="body">' +
+                (ev.allDay ? "" : '<span class="time">' + fmtTime(ev.start) + '</span>') +
+                '<span class="title">' + esc(ev.title) + '</span>' +
+                '</span></div>';
+      }
+    }
+    html += '</div></div>';
+  }
+  html += '</div>';
+  document.getElementById("app").innerHTML = html;
+}
+
+async function load() {
+  try {
+    const res = await fetch(GAS_URL);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    render(data);
+  } catch (err) {
+    document.getElementById("app").innerHTML =
+      '<div class="msg">予定を取得できませんでした。' +
+      'GAS_URLの設定とデプロイ状態を確認してください。<br>(' +
+      esc(String(err)) + ')</div>';
+  }
+}
+
+load();
+setInterval(load, REFRESH_MINUTES * 60 * 1000);
+</script>
+
+</body>
+</html>
