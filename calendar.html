@@ -6,13 +6,16 @@
 <title>週間カレンダー</title>
 <style>
   :root {
-    --bg: #ffffff;
-    --text: #37352f;
-    --text-sub: #787774;
-    --text-faint: #b8b7b4;
-    --border: #e9e9e7;
-    --today-bg: #f7f7f5;
-    --today-bar: #37352f;
+    /* Notionダークモード調 */
+    --bg: #191919;
+    --text: #dfdedb;
+    --text-sub: #9b9a97;
+    --text-faint: #6f6e6b;
+    --border: #2f2f2f;
+    --today-bg: #232323;
+    --today-bar: #dfdedb;
+    --sat: #5a9bd5;   /* 土曜: 青 */
+    --sun: #d95550;   /* 日曜: 赤 */
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -81,6 +84,10 @@
     font-weight: 600;
     font-variant-numeric: tabular-nums;
   }
+  /* 土曜は青、日曜は赤(日にちと曜日) */
+  .day-head.sat .date, .day-head.sat .dow { color: var(--sat); }
+  .day-head.sun .date, .day-head.sun .dow { color: var(--sun); }
+
   .day.today .day-head .dow::after {
     content: " 今日";
     color: var(--text);
@@ -174,20 +181,21 @@
 /* ================= 設定 ================= */
 
 // GASをデプロイして得た「ウェブアプリのURL」をここに貼る
+// ※前後の半角の引用符 " " は消さないこと!
 const GAS_URL = "https://script.google.com/macros/s/AKfycbx4wczQOOC97gWKOnn3OWWwFCauN_xoXAHyGoo8jChxn-G9WYxex28sBbv2tiMCC8SeHQ/exec";
 
 // 週の起点: "today" = 今日から7日間 / "monday" = 今週の月曜から7日間
 const START_MODE = "today";
 
-// Googleカレンダーの色ID → グレースケール
+// Googleカレンダーの色ID → グレースケール(ダーク用: 明るいほど強調)
 // (2=セージ, 4=フラミンゴ, 5=バナナ, 6=ミカン/パンプキン, 8=グラファイト)
 const COLOR_MAP = {
-  "":  "#9b9a97",  // 色未設定
-  "8": "#37352f",  // グラファイト … 最も濃く
-  "2": "#5f5e5b",  // セージ
-  "6": "#787774",  // パンプキン
-  "4": "#a5a29e",  // フラミンゴ
-  "5": "#c9c8c5"   // バナナ … 最も薄く
+  "":  "#8a8985",  // 色未設定
+  "8": "#e8e7e4",  // グラファイト … 最も明るく
+  "2": "#c0bfbc",  // セージ
+  "6": "#9b9a97",  // パンプキン
+  "4": "#7d7c78",  // フラミンゴ
+  "5": "#5f5e5b"   // バナナ … 最も控えめ
 };
 
 // 自動更新の間隔(分)
@@ -235,7 +243,6 @@ function render(data) {
   document.getElementById("range").textContent =
     (a.getMonth() + 1) + "/" + a.getDate() + " – " +
     (b.getMonth() + 1) + "/" + b.getDate();
-  const upd = new Date(data.updated);
   document.getElementById("updated").textContent =
     "更新 " + fmtTime(new Date());
 
@@ -265,9 +272,12 @@ function render(data) {
     });
 
     const isToday = dayStart === todayKey;
+    const wd = day.getDay();
+    const dowClass = wd === 0 ? " sun" : (wd === 6 ? " sat" : "");
+
     html += '<div class="day' + (isToday ? " today" : "") + '">';
-    html += '<div class="day-head"><span class="date">' + day.getDate() +
-            '</span><span class="dow">' + DOW[day.getDay()] + '</span></div>';
+    html += '<div class="day-head' + dowClass + '"><span class="date">' + day.getDate() +
+            '</span><span class="dow">' + DOW[wd] + '</span></div>';
     html += '<div class="events">';
 
     if (todays.length === 0) {
