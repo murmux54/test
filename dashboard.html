@@ -13,6 +13,8 @@
     --bar: #e3e2e0;
     --accent: #37352f;
     --faint: #b8b7b4;
+    --c-sat: #447acb;   /* 土曜: 青 */
+    --c-sun: #d44c47;   /* 日曜・祝日: 赤 */
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -23,6 +25,8 @@
       --bar: #2f2f2f;
       --accent: #d4d4d4;
       --faint: #6f6e6b;
+      --c-sat: #5a9bd5;
+      --c-sun: #d95550;
     }
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -61,7 +65,7 @@
     overflow: hidden;
   }
   .main {
-    height: 116px;
+    height: 152px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -103,6 +107,57 @@
   }
   .seconds > div { height: 100%; width: 0%; background: var(--accent); border-radius: 1px; }
 
+  /* ==== 月間カレンダー ==== */
+  .cal-head {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  .cal-head button {
+    background: none;
+    border: none;
+    color: var(--sub);
+    font: inherit;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0 6px;
+    cursor: pointer;
+  }
+  .cal-head button:hover { color: var(--fg); }
+  #cal-title { cursor: pointer; min-width: 7em; }
+
+  .calgrid {
+    width: 100%;
+    max-width: 232px;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    row-gap: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  .calgrid .dow {
+    font-size: 9px;
+    color: var(--sub);
+    padding-bottom: 3px;
+  }
+  .calgrid .day {
+    width: 20px;
+    height: 20px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    border-radius: 50%;
+  }
+  .calgrid .sat { color: var(--c-sat); }
+  .calgrid .sun { color: var(--c-sun); }
+  .calgrid .day.today {
+    background: var(--fg);
+    color: var(--bg);
+    font-weight: 600;
+  }
+
   /* ==== 天気 ==== */
   .now { display: flex; align-items: center; justify-content: center; gap: 12px; }
   .icon { color: var(--fg); line-height: 0; }
@@ -129,38 +184,6 @@
   .times .t { display: flex; align-items: center; gap: 5px; }
   .times svg { width: 16px; height: 16px; color: var(--sub); }
 
-  /* ==== トレンド ==== */
-  .tlist { width: 100%; display: flex; flex-direction: column; text-align: left; }
-  .titem {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    padding: 2px 2px 3px;
-    border-bottom: 1px solid var(--line);
-    text-decoration: none;
-    color: var(--fg);
-    font-size: 12px;
-    line-height: 1.5;
-  }
-  .titem:last-child { border-bottom: none; }
-  .titem .rank {
-    flex: none;
-    width: 1.1em;
-    text-align: right;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    color: var(--faint);
-  }
-  .titem:first-child .rank { color: var(--fg); }
-  .titem .word {
-    flex: 1;
-    min-width: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .titem .traffic { flex: none; font-size: 10px; color: var(--faint); }
-
   /* ==== レスポンシブ: 2×2 → 1列 ==== */
   @media (max-width: 900px) {
     .dash { grid-template-columns: repeat(2, 1fr); row-gap: 16px; }
@@ -185,25 +208,29 @@
     <div class="foot" id="c-foot">&nbsp;</div>
   </div>
 
-  <!-- 2. 天気 -->
+  <!-- 2. 月間カレンダー -->
+  <div class="card">
+    <div class="label cal-head">
+      <button id="cal-prev" aria-label="前の月">&#8249;</button>
+      <span id="cal-title">&nbsp;</span>
+      <button id="cal-next" aria-label="次の月">&#8250;</button>
+    </div>
+    <div class="main"><div class="calgrid" id="cal-grid"></div></div>
+    <div class="foot" id="cal-foot">&nbsp;</div>
+  </div>
+
+  <!-- 3. 天気 -->
   <div class="card">
     <div class="label">FUKUOKA</div>
     <div class="main" id="w-main"><div class="error">読み込み中…</div></div>
     <div class="foot" id="w-foot">&nbsp;</div>
   </div>
 
-  <!-- 3. 日の出・日の入り -->
+  <!-- 4. 日の出・日の入り -->
   <div class="card">
     <div class="label">FUKUOKA</div>
     <div class="main" id="s-main"><div class="error">読み込み中…</div></div>
     <div class="foot" id="s-foot">&nbsp;</div>
-  </div>
-
-  <!-- 4. Googleトレンド -->
-  <div class="card">
-    <div class="label">GOOGLE TRENDS &middot; JP</div>
-    <div class="main" id="t-main"><div class="error">読み込み中…</div></div>
-    <div class="foot" id="t-foot">&nbsp;</div>
   </div>
 
 </div>
@@ -214,19 +241,13 @@
 const LAT = 33.57;
 const LON = 130.40;
 
-// トレンド用GAS(トレンドプロジェクト)のウェブアプリURLをここに貼る
-// ※前後の半角の引用符 " " は消さないこと!
-const TRENDS_GAS_URL = "https://script.google.com/macros/s/AKfycbwNkoJzdCVS-p7HLPk_aCas2y6YDxwK18I8RkYpgMeB5FZ82S1Y2kszulIhotDx9_iw/exec";
-
-// トレンド表示件数(高さ固定のため5推奨)
-const TRENDS_SHOW = 5;
-
-// トレンドのタップでGoogle検索を開くか
-const TRENDS_CLICKABLE = true;
+// 日本の祝日データ(holidays-jp: 昨年・今年・来年分)
+const HOLIDAY_URL = "https://holidays-jp.github.io/api/v1/date.json";
 
 /* ======================================== */
 
 const pad = n => String(n).padStart(2, "0");
+const hm = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
 function esc(s) {
   const div = document.createElement("div");
@@ -262,7 +283,97 @@ function tick() {
 tick();
 setInterval(tick, 250);
 
-/* ==== 2. 天気 ==== */
+/* ==== 2. 月間カレンダー ==== */
+const DOWJ = ["日", "月", "火", "水", "木", "金", "土"];
+let holidays = {};   // "2026-07-20" → "海の日"
+let viewY, viewM;    // 表示中の年・月(0-11)
+
+const ymd = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
+
+function renderCal() {
+  const today = new Date();
+  const isCurrentMonth =
+    viewY === today.getFullYear() && viewM === today.getMonth();
+
+  document.getElementById("cal-title").textContent =
+    `${viewY}年${viewM + 1}月`;
+
+  const startDow = new Date(viewY, viewM, 1).getDay();
+  const daysInMonth = new Date(viewY, viewM + 1, 0).getDate();
+
+  let html = "";
+  DOWJ.forEach(function (d, i) {
+    const cls = i === 0 ? " sun" : (i === 6 ? " sat" : "");
+    html += '<span class="dow' + cls + '">' + d + "</span>";
+  });
+  for (let i = 0; i < startDow; i++) html += "<span></span>";
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dow = (startDow + d - 1) % 7;
+    const holidayName = holidays[ymd(viewY, viewM, d)];
+    let cls = "day";
+    if (holidayName || dow === 0) cls += " sun";      // 祝日・日曜は赤
+    else if (dow === 6) cls += " sat";                // 土曜は青
+    if (isCurrentMonth && d === today.getDate()) cls += " today";
+    html += '<span class="' + cls + '"' +
+            (holidayName ? ' title="' + esc(holidayName) + '"' : "") +
+            ">" + d + "</span>";
+  }
+  document.getElementById("cal-grid").innerHTML = html;
+
+  // フッター: 次の祝日
+  const todayStr = ymd(today.getFullYear(), today.getMonth(), today.getDate());
+  const next = Object.keys(holidays).sort().find(k => k >= todayStr);
+  if (next) {
+    const [y, m, d] = next.split("-").map(Number);
+    document.getElementById("cal-foot").innerHTML =
+      `<span>次の祝日 <b>${esc(holidays[next])}</b> ${m}/${d}</span>`;
+  } else {
+    document.getElementById("cal-foot").innerHTML = "&nbsp;";
+  }
+}
+
+function initCal() {
+  const now = new Date();
+  viewY = now.getFullYear();
+  viewM = now.getMonth();
+  renderCal();
+
+  document.getElementById("cal-prev").addEventListener("click", function () {
+    viewM--;
+    if (viewM < 0) { viewM = 11; viewY--; }
+    renderCal();
+  });
+  document.getElementById("cal-next").addEventListener("click", function () {
+    viewM++;
+    if (viewM > 11) { viewM = 0; viewY++; }
+    renderCal();
+  });
+  // 月タイトルをクリックすると今月に戻る
+  document.getElementById("cal-title").addEventListener("click", function () {
+    const n = new Date();
+    viewY = n.getFullYear();
+    viewM = n.getMonth();
+    renderCal();
+  });
+}
+
+async function loadHolidays() {
+  try {
+    const res = await fetch(HOLIDAY_URL);
+    if (!res.ok) throw new Error(res.status);
+    holidays = await res.json();
+  } catch (e) {
+    holidays = {}; // 取得失敗時は祝日色なしで表示継続
+  }
+  renderCal();
+}
+initCal();
+loadHolidays();
+// 日付が変わったときのために1時間ごとに再描画
+setInterval(renderCal, 60 * 60 * 1000);
+
+/* ==== 3. 天気 ==== */
 const S = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">';
 const ICONS = {
   sun: S + '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>',
@@ -315,11 +426,10 @@ async function loadWeather() {
 loadWeather();
 setInterval(loadWeather, 30 * 60 * 1000);
 
-/* ==== 3. 日の出・日の入り ==== */
+/* ==== 4. 日の出・日の入り ==== */
 const RISE = S + '<path d="M12 2v6"/><path d="m4.93 10.93 1.41 1.41"/><path d="M2 18h2"/><path d="M20 18h2"/><path d="m19.07 10.93-1.41 1.41"/><path d="M22 22H2"/><path d="m8 6 4-4 4 4"/><path d="M16 18a4 4 0 0 0-8 0"/></svg>';
 const SET  = S + '<path d="M12 10V2"/><path d="m4.93 10.93 1.41 1.41"/><path d="M2 18h2"/><path d="M20 18h2"/><path d="m19.07 10.93-1.41 1.41"/><path d="M22 22H2"/><path d="m16 6-4 4-4-4"/><path d="M16 18a4 4 0 0 0-8 0"/></svg>';
 
-const hm = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 let sunrise = null, sunset = null;
 
 function drawSky() {
@@ -381,43 +491,6 @@ async function loadSun() {
 loadSun();
 setInterval(renderSun, 60 * 1000);
 setInterval(loadSun, 6 * 60 * 60 * 1000);
-
-/* ==== 4. Googleトレンド ==== */
-async function loadTrends() {
-  try {
-    const res = await fetch(TRENDS_GAS_URL);
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const data = await res.json();
-    const items = (data.items || []).slice(0, TRENDS_SHOW);
-    if (items.length === 0) throw new Error("no items");
-
-    let html = '<div class="tlist">';
-    items.forEach(function (it, i) {
-      const inner =
-        '<span class="rank">' + (i + 1) + '</span>' +
-        '<span class="word">' + esc(it.title) + '</span>' +
-        (it.traffic ? '<span class="traffic">' + esc(it.traffic) + '</span>' : '');
-      if (TRENDS_CLICKABLE) {
-        const q = encodeURIComponent(it.title);
-        html += '<a class="titem" target="_blank" rel="noopener" ' +
-                'href="https://www.google.com/search?q=' + q + '">' + inner + '</a>';
-      } else {
-        html += '<div class="titem">' + inner + '</div>';
-      }
-    });
-    html += '</div>';
-
-    document.getElementById("t-main").innerHTML = html;
-    const now = new Date();
-    document.getElementById("t-foot").innerHTML =
-      '<span>更新 <b>' + hm(now) + '</b></span>';
-  } catch (err) {
-    document.getElementById("t-main").innerHTML =
-      '<div class="error">トレンドを取得できませんでした</div>';
-  }
-}
-loadTrends();
-setInterval(loadTrends, 15 * 60 * 1000);
 </script>
 </body>
 </html>
